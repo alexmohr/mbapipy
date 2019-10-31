@@ -99,6 +99,7 @@ WINDOW_OPTIONS = ["windowstatusrearleft",
                   'windowsClosed']
 
 DOOR_OPTIONS = [
+    'locked',
     'doorStateFrontLeft',
     'doorStateFrontRight', 
     'doorStateRearLeft', 

@@ -129,6 +129,7 @@ SWITCHES = {
 SENSORS = {
     'lock': ['Lock', None, "doors", 'locked', 'value', None,
              {
+                 'locked',             
                  'doorStateFrontLeft',
                  'doorStateFrontRight',
                  'doorStateRearLeft',
