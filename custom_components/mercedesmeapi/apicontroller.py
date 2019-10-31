@@ -111,8 +111,10 @@ DOOR_OPTIONS = [
     'frontRightDoorClosed', 
     'rearLeftDoorClosed', 
     'rearRightDoorClosed', 
-    'rearRightDoorClosed', 
+    'rearRightDoorClosed',
+    'fuelLidClosed',
     'doorsClosed',
+    'trunkClosed',
     'trunkStateRollup',
     'sunroofstatus',
     'locked']

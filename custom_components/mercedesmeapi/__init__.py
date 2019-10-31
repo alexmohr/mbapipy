@@ -143,6 +143,8 @@ SENSORS = {
                  'rearRightDoorClosed',
                  'rearRightDoorClosed',
                  'doorsClosed',
+                 'fuelLidClosed',
+                 'trunkClosed',
                  'trunkStateRollup',
                  'sunroofstatus',}],
 
