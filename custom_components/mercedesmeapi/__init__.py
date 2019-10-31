@@ -38,6 +38,7 @@ BINARY_SENSORS = {
                            'value',
                            None,
                            {
+                               'fuelLidClosed',                           
                                'warningbrakefluid',
                                'warningwashwater',
                                'warningcoolantlevellow',
@@ -98,6 +99,7 @@ ODOMETER_OPTIONS = ["odo",
                     "ecoscorebonusrange",
                     "ecoscoreconst",
                     "ecoscoreaccel",
+                    "ecoSpeedHistogram"
                     "gasconsumptionstart",
                     "gasconsumptionreset",
                     "gasTankRange",
@@ -182,6 +184,8 @@ SENSORS = {
     'odometer': ['Odometer', 'Km', 'odometer', 'odo',
                  'value', None,
                  {
+                     "odo",
+                     "ecoShiftingHistogram",
                      'distanceReset',
                      "distanceStart",
                      "averageSpeedReset",

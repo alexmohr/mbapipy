@@ -47,6 +47,7 @@ CAR_FEATURE_URL = "{0}/api/v2/dashboarddata/%s/vehicle".format(URL_USR_API)
 APP_USER_AGENT = "MercedesMe/2.13.2+639 (Android 5.1)"
 
 ODOMETER_OPTIONS = ["odo",
+                    "ecoShiftingHistogram",
                     "distanceReset",
                     "distanceStart",
                     "averageSpeedReset",
@@ -136,6 +137,7 @@ ELECTRIC_OPTIONS = [
 
 
 BINARY_SENSOR_OPTIONS = [
+    'fuelLidClosed',
     'warningwashwater',
     'warningenginelight',
     'warningbrakefluid',
