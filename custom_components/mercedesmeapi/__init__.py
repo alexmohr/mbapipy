@@ -203,6 +203,7 @@ SENSORS = {
                      "gasconsumptionreset",
                      "gasTankRange",
                      "gasTankLevel",
+                     "tankLevelAdBlue",
                      "liquidconsumptionstart",
                      "liquidconsumptionreset",
                      "liquidRangeSkipIndication",
