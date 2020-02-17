@@ -2,7 +2,10 @@
 
 MercedesME platform as a Custom Component for Home Assistant.
 
-Remove other MercedesMe components before use of this one.
+IMPORTANT: 
+
+* Please login once in the MercedesME IOS or Android app before you install this component. 
+* For US/CA the app name is "MercedesME Connect" (only newer cars are supported in this region)
 
 Configuration:
 ```
@@ -16,47 +19,53 @@ Optional configuration values
 mercedesmeapi:
   username: YOUR_USERNAME
   password: YOUR_PASSWORD
-  pin: XXXX                      # need to open the lock, please use the Mercedes web or app to set-up the pin
+  pin: XXXX                           # required to open the lock or to start the engine, please use the Mercedes web or app to set-up the pin
   
-  country_code: DE               # two digts country code
-  accept_lang: en_DE             # four digits country code
-  save_car_details: true         # save a json to the HA config directory with the features and states, please use this for debug only 
+  country_code: DE                    # two digts country code
+  accept_lang: en_DE                  # four digits country code
+  save_car_details: true              # save a json to the HA config directory with the features and states, please use this for debug only 
+  cars:                               # Optional block to overwrite car specific options
+    - vin: FINXXXXXXXXXXXXX1          # required finorvin
+      tire_warning: tirewarninglamp   # optional attributname for tire_warning binary sensor. some cars use tireWarningRollup or tirewarninglamp 
+    - vin: FINXXXXXXXXXXXXX2
+      tire_warning: tireWarningRollup
 ```
 
 Available components:
-- Lock
-- Aux Heat Switch
+* Lock
+* Remote Start Switch
+* Aux Heat Switch
 
-- Binary Sensors:
+* Binary Sensors:
 ```
-- warningenginelight
+* warningenginelight
   attributes: warningbrakefluid, warningwashwater, warningcoolantlevellow, warninglowbattery
 
-- parkbrakestatus
+* parkbrakestatus
   attributes: preWarningBrakeLiningWear
 
-- windowsClosed
+* windowsClosed
   attributes: windowstatusrearleft, windowstatusrearright, windowstatusfrontright, windowstatusfrontleft
 
-- tirewarninglamp
+* tirewarninglamp
   attributes: tirepressureRearLeft, tirepressureRearRight, tirepressureFrontRight, tirepressureFrontLeft, tirewarningsrdk, tirewarningsprwtireMarkerFrontRight, tireMarkerFrontLeft, tireMarkerRearLeft, tireMarkerRearRight, tireWarningRollup, lastTirepressureTimestamp
 ```
 
-- Sensors:
+* Sensors:
 ```
-- lock
-  attributes: doorStateFrontLeft, doorStateFrontRight, doorStateRearLeft, doorStateRearRight, frontLeftDoorLocked, frontRightDoorLocked, rearLeftDoorLocked, rearRightDoorLocked, frontLeftDoorClosed, frontRightDoorClosed, rearLeftDoorClosed, rearRightDoorClosed, rearRightDoorClosed, doorsClosed, trunkStateRollup, sunroofstatus
+* lock
+  attributes: doorStateFrontLeft, doorStateFrontRight, doorStateRearLeft, doorStateRearRight, frontLeftDoorLocked, frontRightDoorLocked, rearLeftDoorLocked, rearRightDoorLocked, frontLeftDoorClosed, frontRightDoorClosed, rearLeftDoorClosed, rearRightDoorClosed, rearRightDoorClosed, doorsClosed, trunkStateRollup, sunroofstatus, fuelLidClosed, engineHoodClosed
 
-- rangeElectricKm
+* rangeElectricKm
   attributes: rangeelectric, rangeElectricKm, criticalStateOfSoc, maxrange, stateOfChargeElectricPercent, endofchargetime, criticalStateOfDeparturetimesoc, warninglowbattery, electricconsumptionreset, maxStateOfChargeElectricPercent, supplybatteryvoltage, electricChargingStatus, chargingstatus, soc, showChargingErrorAndDemand, electricconsumptionstart
   
-- auxheatstatus
+* auxheatstatus
   attributes: auxheatActive, auxheatwarnings, auxheatruntime, auxheatwarningsPush, auxheattimeselection, auxheattime1, auxheattime2, auxheattime3
 
-- tanklevelpercent
+* tanklevelpercent
 
-- odometer
-  attributes: distanceReset, distanceStart, averageSpeedReset, averageSpeedStart, distanceZEReset, drivenTimeZEReset, drivenTimeReset, drivenTimeStart, ecoscoretotal, ecoscorefreewhl, ecoscorebonusrange, ecoscoreconst, ecoscoreaccel, gasconsumptionstart, gasconsumptionreset, gasTankRange, gasTankLevel, liquidconsumptionstart, liquidconsumptionreset, liquidRangeSkipIndication, rangeliquid, serviceintervaldays, tanklevelpercent, tankReserveLamp
+* odometer
+  attributes: distanceReset, distanceStart, averageSpeedReset, averageSpeedStart, distanceZEReset, drivenTimeZEReset, drivenTimeReset, drivenTimeStart, ecoscoretotal, ecoscorefreewhl, ecoscorebonusrange, ecoscoreconst, ecoscoreaccel, gasconsumptionstart, gasconsumptionreset, gasTankRange, gasTankLevel, liquidconsumptionstart, liquidconsumptionreset, liquidRangeSkipIndication, rangeliquid, serviceintervaldays, tanklevelpercent, tankReserveLamp, batteryState
   
 ```
 
@@ -73,3 +82,8 @@ logger:
     custom_components.mercedesmeapi.OAuth: debug
 ```
 
+
+Notes:
+- Tested countries: CA, DE, DK, ES, FI, NL, PL, UK, US
+- For Canada please use Country Code US currently
+- Cars out of North America and Europe can't be used at the same time

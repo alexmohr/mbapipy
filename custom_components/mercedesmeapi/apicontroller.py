@@ -7,106 +7,108 @@ Attributes:
     update_interval (int): min update intervall in seconds
 """
 
-import base64
-import hashlib
 import json
 import logging
-from os import urandom
-import random
-import string
 import time
-import uuid
 import datetime
 
-from urllib.parse import urlparse, parse_qs
 from multiprocessing import RLock
-
 import requests
-import lxml.html
 
 _LOGGER = logging.getLogger(__name__)
 
-URL_VHS_API = "https://vhs.meapp.secure.mercedes-benz.com"
-URL_USR_API = "https://bff.meapp.secure.mercedes-benz.com"
+URL_VHS_API = lambda region: f"https://vhs.meapp{region}.secure.mercedes-benz.com/api/v1/vehicles"  # noqa: E731, E501
+URL_USR_API = lambda region: f"https://bff.meapp{region}.secure.mercedes-benz.com"                  # noqa: E731, E501
 
-CLIENT_ID = "4390b0db-4be9-40e9-9147-5845df537beb"
-API_ID = "MCMAPP.FE_PROD"
-AUTH_REDIR_URL = "https://cgw.meapp.secure.mercedes-benz.com/endpoint/api/v1/redirect"
+ME_STATUS_URL = lambda usr_url: f"{usr_url}/api/v2/appdata"                                         # noqa: E731, E501
+CAR_STATUS_URL = lambda vhs_url: f"{vhs_url}/%s/dynamic?forceRefresh=true"                          # noqa: E731, E501
+CAR_LOCAT_URL = lambda vhs_url: f"{vhs_url}/%s/location"                                            # noqa: E731, E501
+CAR_LOCK_URL = lambda vhs_url: f"{vhs_url}/%s/doors/lock"                                           # noqa: E731, E501
+CAR_UNLOCK_URL = lambda vhs_url: f"{vhs_url}/%s/doors/unlock"                                       # noqa: E731, E501
+CAR_HEAT_ON_URL = lambda vhs_url: f"{vhs_url}/%s/auxheat/start"                                     # noqa: E731, E501
+CAR_HEAT_OFF_URL = lambda vhs_url: f"{vhs_url}/%s/auxheat/stop"                                     # noqa: E731, E501
+CAR_REMOTE_START_ON_URL = lambda vhs_url: f"{vhs_url}/%s/remoteengine/start"                        # noqa: E731, E501
+CAR_REMOTE_START_OFF_URL = lambda vhs_url: f"{vhs_url}/%s/remoteengine/stop"                        # noqa: E731, E501
+CAR_CLIMATE_CONF_URL = lambda vhs_url: f"{vhs_url}/%s/precond/configure"                            # noqa: E731, E501
+CAR_CLIMATE_ON_URL = lambda vhs_url: f"{vhs_url}/%s/precond/start"                                  # noqa: E731, E501
+CAR_CLIMATE_OFF_URL = lambda vhs_url: f"{vhs_url}/%s/precondAtDeparture/disable"                    # noqa: E731, E501
+CAR_FEATURE_URL = lambda usr_url: f"{usr_url}/api/v2/dashboarddata/%s/vehicle"                      # noqa: E731, E501
 
-ME_STATUS_URL = "{0}/api/v2/appdata".format(URL_USR_API)
-CAR_STATUS_URL = "{0}/api/v1/vehicles/%s/dynamic?forceRefresh=true".format(URL_VHS_API)
-CAR_LOCAT_URL = "{0}/api/v1/vehicles/%s/location".format(URL_VHS_API)
-CAR_LOCK_URL = "{0}/api/v1/vehicles/%s/doors/lock".format(URL_VHS_API)
-CAR_UNLOCK_URL = "{0}/api/v1/vehicles/%s/doors/unlock".format(URL_VHS_API)
-CAR_HEAT_ON_URL = "{0}/api/v1/vehicles/%s/auxheat/start".format(URL_VHS_API)
-CAR_HEAT_OFF_URL = "{0}/api/v1/vehicles/%s/auxheat/stop".format(URL_VHS_API)
-CAR_CLIMATE_ON_URL = "{0}/api/v1/vehicles/%s/precond/start".format(URL_VHS_API)
-CAR_CLIMATE_OFF_URL = "{0}/api/v1/vehicles/%s/precondAtDeparture/disable".format(URL_VHS_API)
-CAR_FEATURE_URL = "{0}/api/v2/dashboarddata/%s/vehicle".format(URL_USR_API)
+APP_USER_AGENT = "MercedesMe/2.15.1+753 (Android 6.0)"
 
-APP_USER_AGENT = "MercedesMe/2.13.2+639 (Android 5.1)"
+HTTP_GET = "get"
+HTTP_POST = "post"
+# HTTP_PROXY = {'https': 'http://localhost:8080'}
 
-ODOMETER_OPTIONS = ["odo",
-                    "ecoShiftingHistogram",
-                    "distanceReset",
-                    "distanceStart",
-                    "averageSpeedReset",
-                    "averageSpeedStart",
-                    "distanceZEReset",
-                    "drivenTimeZEReset",
-                    "drivenTimeReset",
-                    "drivenTimeStart",
-                    "ecoscoretotal",
-                    "ecoscorefreewhl",
-                    "ecoscorebonusrange",
-                    "ecoscoreconst",
-                    "ecoscoreaccel",
-                    "gasconsumptionstart",
-                    "gasconsumptionreset",
-                    "gasTankRange",
-                    "gasTankLevel",
-                    "tankLevelAdBlue",
-                    "liquidconsumptionstart",
-                    "liquidconsumptionreset",
-                    "liquidRangeSkipIndication",
-                    "rangeliquid",
-                    "serviceintervaldays",
-                    "tanklevelpercent",
-                    "tankReserveLamp"]
+# Set to False for testing with tools like fiddler
+# Change to True for production
+LOGIN_VERIFY_SSL_CERT = True
 
-LOCATION_OPTIONS = ["latitude",
-                    "longitude",
-                    "heading"]
 
-TIRE_OPTIONS = ["tirepressureRearLeft",
-                "tirepressureRearRight",
-                "tirepressureFrontRight",
-                "tirepressureFrontLeft",
-                "tirewarninglamp",
-                "tirewarningsrdk",
-                "tirewarningsprw"
-                "tireMarkerFrontRight",
-                "tireMarkerFrontLeft",
-                "tireMarkerRearLeft",
-                "tireMarkerRearRight",
-                "tireWarningRollup",
-                "lastTirepressureTimestamp"]
+ODOMETER_OPTIONS = [
+    "odo",
+    "distanceReset",
+    "distanceStart",
+    "averageSpeedReset",
+    "averageSpeedStart",
+    "distanceZEReset",
+    "drivenTimeZEReset",
+    "drivenTimeReset",
+    "drivenTimeStart",
+    "ecoscoretotal",
+    "ecoscorefreewhl",
+    "ecoscorebonusrange",
+    "ecoscoreconst",
+    "ecoscoreaccel",
+    "gasconsumptionstart",
+    "gasconsumptionreset",
+    "gasTankRange",
+    "gasTankLevel",
+    "liquidconsumptionstart",
+    "liquidconsumptionreset",
+    "liquidRangeSkipIndication",
+    "rangeliquid",
+    "serviceintervaldays",
+    "tanklevelpercent",
+    "tankReserveLamp",
+    "batteryState"]
 
-WINDOW_OPTIONS = ["windowstatusrearleft",
-                  "windowstatusrearright",
-                  "windowstatusfrontright",
-                  "windowstatusfrontleft",
-                  'windowsClosed']
+LOCATION_OPTIONS = [
+    "latitude",
+    "longitude",
+    "heading"]
+
+TIRE_OPTIONS = [
+    "tirepressureRearLeft",
+    "tirepressureRearRight",
+    "tirepressureFrontRight",
+    "tirepressureFrontLeft",
+    "tirewarninglamp",
+    "tirewarningsrdk",
+    "tirewarningsprw"
+    "tireMarkerFrontRight",
+    "tireMarkerFrontLeft",
+    "tireMarkerRearLeft",
+    "tireMarkerRearRight",
+    "tireWarningRollup",
+    "lastTirepressureTimestamp"]
+
+WINDOW_OPTIONS = [
+    "windowstatusrearleft",
+    "windowstatusrearright",
+    "windowstatusfrontright",
+    "windowstatusfrontleft",
+    'windowsClosed']
 
 DOOR_OPTIONS = [
     'locked',
     'doorStateFrontLeft',
-    'doorStateFrontRight', 
-    'doorStateRearLeft', 
-    'doorStateRearRight', 
-    'frontLeftDoorLocked', 
-    'frontRightDoorLocked', 
-    'rearLeftDoorLocked', 
+    'doorStateFrontRight',
+    'doorStateRearLeft',
+    'doorStateRearRight',
+    'frontLeftDoorLocked',
+    'frontRightDoorLocked',
+    'rearLeftDoorLocked',
     'rearRightDoorLocked',
     'frontLeftDoorClosed', 
     'frontRightDoorClosed', 
@@ -118,7 +120,8 @@ DOOR_OPTIONS = [
     'trunkClosed',
     'trunkStateRollup',
     'sunroofstatus',
-    'locked']
+    'locked',
+    'fuelLidClosed']
 
 ELECTRIC_OPTIONS = [
     'rangeelectric',
@@ -137,8 +140,6 @@ ELECTRIC_OPTIONS = [
     'soc',
     'showChargingErrorAndDemand',
     'electricconsumptionstart']
-
-
 
 BINARY_SENSOR_OPTIONS = [
     'fuelLidClosed',
@@ -164,12 +165,13 @@ AUX_HEAT_OPTIONS = [
 
 PRE_COND_OPTIONS = [
     'preconditionState',
-    'precondimmediate'
-]
+    'precondimmediate']
 
-# Set to False for testing with tools like fiddler
-# Change to True for production
-LOGIN_VERIFY_SSL_CERT = True
+REMOTE_START_OPTIONS = [
+    'remoteEngine',
+    'remoteStartEndtime',
+    'remoteStartTemperature'
+]
 
 
 class Car(object):
@@ -185,6 +187,7 @@ class Car(object):
         self.powerkw = None
         self.numberofdoors = None
         self.numberofseats = None
+        self.vehicle_title = None
 
         self.vehicleHealthStatus = None
         self.binarysensors = None
@@ -199,8 +202,10 @@ class Car(object):
         self.precond = None
         self.electric = None
 
+
 class StateOfObject(object):
-    def __init__(self, unit=None, value=None, retrievalstatus=None, timestamp=None):
+    def __init__(self, unit=None, value=None, retrievalstatus=None,
+                 timestamp=None):
         self.unit = None
         self.value = None
         self.timestamp = None
@@ -215,41 +220,56 @@ class StateOfObject(object):
         if timestamp is not None:
             self.timestamp = timestamp
 
+
 class Tires(object):
     def __init__(self):
         self.name = "Tires"
+
 
 class Odometer(object):
     def __init__(self):
         self.name = "Odometer"
 
+
 class Features(object):
     def __init__(self):
         self.name = "Features"
+
 
 class Windows(object):
     def __init__(self):
         self.name = "Windows"
 
+
 class Doors(object):
     def __init__(self):
-        self.name = "Features"
+        self.name = "Doors"
+
 
 class Electric(object):
     def __init__(self):
         self.name = "Electric"
 
+
 class Auxheat(object):
     def __init__(self):
         self.name = "Auxheat"
+
 
 class Precond(object):
     def __init__(self):
         self.name = "Precond"
 
+
 class Binary_Sensors(object):
     def __init__(self):
         self.name = "Binary_Sensors"
+
+
+class Remote_Start(object):
+    def __init__(self):
+        self.name = "Remote_Start"
+
 
 class Location(object):
     def __init__(self, latitude=None, longitude=None, heading=None):
@@ -264,17 +284,20 @@ class Location(object):
         if heading is not None:
             self.heading = heading
 
+
 class CarAttribute(object):
     def __init__(self, value, retrievalstatus, timestamp):
         self.value = value
         self.retrievalstatus = retrievalstatus
         self.timestamp = timestamp
 
+
 class Controller(object):
     """ Simple Mercedes me API.
     """
-    def __init__(self, auth_handler, update_interval, accept_lang, country_code,
-                 excluded_cars, save_car_details, pin, save_path):
+    def __init__(self, auth_handler, update_interval, accept_lang,
+                 country_code, excluded_cars, save_car_details,
+                 pin, save_path):
 
         self.__lock = RLock()
         self.accept_lang = accept_lang
@@ -288,8 +311,11 @@ class Controller(object):
         self.save_car_details = save_car_details
         self.save_path = save_path
         self.pin = pin
+        self.region = "-an" if country_code == "US" else ""
+
         self.session = requests.session()
-        
+        # self.session.proxies.update(HTTP_PROXY)
+
         _LOGGER.debug("Controller init complete. Start _get_cars")
         self._get_cars()
 
@@ -298,17 +324,41 @@ class Controller(object):
         self._update_cars()
 
     def lock(self, car_id):
-        return self._execute_car_action(CAR_LOCK_URL, car_id, 'car unlock', None)
+        return self._execute_car_action(
+            CAR_LOCK_URL(URL_VHS_API(self.region)),
+            car_id,
+            'car unlock',
+            None)
 
     def unlock(self, car_id):
-        return self._execute_car_action(CAR_UNLOCK_URL, car_id, 'car unlock', self.pin)
+        return self._execute_car_action(
+            CAR_UNLOCK_URL(URL_VHS_API(self.region)),
+            car_id,
+            'car unlock',
+            self.pin)
+
+    def remotestart_on(self, car_id):
+        return self._execute_car_action(
+            CAR_REMOTE_START_ON_URL(URL_VHS_API(self.region)),
+            car_id.get('car_id'),
+            'car remote_start on',
+            self.pin)
+
+    def remotestart_off(self, car_id):
+        return self._execute_car_action(
+            CAR_REMOTE_START_OFF_URL(URL_VHS_API(self.region)),
+            car_id.get('car_id'),
+            'car remote_start off',
+            None)
 
     def switch_car_feature(self, action=None, car_id=None):
         function_list = {
             'heater_on': self.heater_on,
             'heater_off': self.heater_off,
             'climate_on': self.climate_on,
-            'climate_off': self.climate_off
+            'climate_off': self.climate_off,
+            'remote_start_on': self.remotestart_on,
+            'remote_start_off': self.remotestart_off
         }
         parameters = {
             'car_id': car_id
@@ -318,88 +368,143 @@ class Controller(object):
 
     def heater_on(self, car_id):
         now = datetime.datetime.now()
-        post_data = json.dumps({ "currentDepartureTime":(now.hour*60 + now.minute) })
-        return self._execute_car_action(CAR_HEAT_ON_URL, car_id.get('car_id'),
-                                        'heater_on', None, post_data)
+
+        post_data = json.dumps(
+            {"currentDepartureTime": (now.hour * 60 + now.minute)})
+
+        return self._execute_car_action(
+            CAR_HEAT_ON_URL(URL_VHS_API(self.region)),
+            car_id.get('car_id'),
+            'heater_on',
+            None,
+            post_data)
 
     def heater_off(self, car_id):
-        return self._execute_car_action(CAR_HEAT_OFF_URL, car_id.get('car_id'),
-                                        'heater_off', None, None)
+        return self._execute_car_action(
+            CAR_HEAT_OFF_URL(URL_VHS_API(self.region)),
+            car_id.get('car_id'),
+            'heater_off',
+            None)
 
     def climate_on(self, car_id):
-        now = datetime.datetime.now()
-        post_data = json.dumps({ "currentDepartureTime":(now.hour*60 + now.minute) })
-        return self._execute_car_action(CAR_CLIMATE_ON_URL, car_id.get('car_id'), 'climate_on', None, post_data)
+        now = self._round_current_time()
+        now_str = f"{now.hour:02}:{now.minute:02}"
+
+        post_data = json.dumps({"currentDepartureTime": (now.hour * 60 + now.minute)},
+                               separators=(',', ':'))
+        _LOGGER.debug("climate_on post_data:")
+        _LOGGER.debug(post_data)
+        if self._execute_car_action(CAR_CLIMATE_ON_URL(URL_VHS_API(self.region)),
+                                    car_id.get('car_id'), 'climate_on', None, post_data):
+            post_data2 = json.dumps({"departureTime": now_str, "mode": "SINGLE_DEPARTURE"},
+                                    separators=(',', ':'))
+            _LOGGER.debug("climate_conf post_data:")
+            _LOGGER.debug(post_data2)
+            self._execute_car_action(CAR_CLIMATE_CONF_URL(URL_VHS_API(self.region)),
+                                     car_id.get('car_id'), 'climate_conf', None, post_data2)
+        else:
+            _LOGGER.debug("climate_on FAILED")
+            return False
 
     def climate_off(self, car_id):
-        return self._execute_car_action(CAR_CLIMATE_OFF_URL, car_id.get('car_id'),
-                                        'climate_off', None, None)
+        return self._execute_car_action(
+            CAR_CLIMATE_OFF_URL(URL_VHS_API(self.region)),
+            car_id.get('car_id'),
+            'climate_off',
+            None)
 
     def _execute_car_action(self, url, car_id, action, pin, post_data=None):
         _LOGGER.debug("%s for %s called", action, car_id)
         self._check_access_token()
-        me_status_header = {
-            "Accept-Language": self.accept_lang,
-            "Authorization": "Bearer {}".format(self.auth_handler.token_info["access_token"]),
-            "country_code": self.country_code,
-            "User-Agent": "MercedesMe/2.13.2+639 (Android 5.1)"
-            }
+        header = self._get_default_header()
         if pin is not None:
-            me_status_header['x-pin'] = pin
+            header['x-pin'] = pin
 
-        if post_data != None:
-            me_status_header['Content-Type']   = "application/json;charset=UTF-8"
-            me_status_header['Content-Length'] = str(len(post_data))
-        result = self._retrieve_json_at_url(url % car_id, me_status_header, "post", post_data)
+        if post_data is not None:
+            header['Content-Type'] = "application/json;charset=UTF-8"
+            header['Content-Length'] = str(len(post_data))
+
+        result = self._retrieve_json_at_url(
+            url % car_id, header, "post", post_data)
+
         _LOGGER.debug(result)
-        if post_data != None:
-            del me_status_header['Content-Type']
-            del me_status_header['Content-Length']
-        
+
+        if post_data is not None:
+            del header['Content-Type']
+            del header['Content-Length']
+
         if result.get("status") == 'PENDING':
             wait_counter = 0
             while wait_counter < 30:
-                result = self._retrieve_json_at_url(url % car_id, me_status_header, "get", None)
+                result = self._retrieve_json_at_url(
+                    url % car_id, header, "get", None)
                 _LOGGER.debug(result)
 
-                if result.get('status') == 'PENDING':
+                if result.get('status') != 'FAILED' and result.get('status') != 'SUCCESS':
                     wait_counter = wait_counter + 1
-                    time.sleep(1)
+                    time.sleep(3)
                 else:
                     break
 
-        self.update()
         if result.get('status') == 'SUCCESS':
+            self.update()
             return True
         else:
             return False
-
 
     def _update_cars(self):
         cur_time = time.time()
         with self.__lock:
             if self.auth_handler.is_token_expired(self.auth_handler.token_info):
-                self.auth_handler.refresh_access_token(self.auth_handler.token_info['refresh_token'])
+                self.auth_handler.refresh_access_token(
+                    self.auth_handler.token_info['refresh_token'])
+
             if cur_time - self.last_update_time > self.update_interval:
                 for car in self.cars:
 
-                    api_result = self._retrieve_car_details(car.finorvin).get("dynamic")
+                    api_result = self._retrieve_car_details(
+                        car.finorvin).get("dynamic")
 
-                    car.odometer = self._get_car_values(api_result, car.finorvin, Odometer(), ODOMETER_OPTIONS)
-                    car.tires = self._get_car_values(api_result, car.finorvin, Tires(), TIRE_OPTIONS)
-                    car.doors = self._get_car_values(api_result, car.finorvin, Doors(), DOOR_OPTIONS)
-            
+                    car.odometer = self._get_car_values(
+                        api_result, car.finorvin, Odometer(), ODOMETER_OPTIONS)
+                    car.tires = self._get_car_values(
+                        api_result, car.finorvin, Tires(), TIRE_OPTIONS)
+                    car.doors = self._get_car_values(
+                        api_result, car.finorvin, Doors(), DOOR_OPTIONS)
+
                     if car.features.vehicle_locator:
                         car.location = self._get_location(car.finorvin)
-            
-                    car.binarysensors = self._get_car_values(api_result, car.finorvin, Binary_Sensors(), BINARY_SENSOR_OPTIONS)
-                    car.windows = self._get_car_values(api_result, car.finorvin, Windows(), WINDOW_OPTIONS)
+
+                    car.binarysensors = self._get_car_values(
+                        api_result, car.finorvin,
+                        Binary_Sensors(), BINARY_SENSOR_OPTIONS)
+
+                    car.windows = self._get_car_values(
+                        api_result, car.finorvin, Windows(), WINDOW_OPTIONS)
+
+                    _LOGGER.debug("_update_cars - Feature Check: charging_clima_control:%s ", {car.features.charging_clima_control})
                     if car.features.charging_clima_control:
-                        car.electric = self._get_car_values(api_result, car.finorvin, Electric(), ELECTRIC_OPTIONS)
+                        car.electric = self._get_car_values(
+                            api_result, car.finorvin,
+                            Electric(), ELECTRIC_OPTIONS)
+
+                    _LOGGER.debug("_update_cars - Feature Check: aux_heat:%s ", {car.features.aux_heat})
                     if car.features.aux_heat:
-                        car.auxheat = self._get_car_values(api_result, car.finorvin, Auxheat(), AUX_HEAT_OPTIONS)
+                        car.auxheat = self._get_car_values(
+                            api_result, car.finorvin,
+                            Auxheat(), AUX_HEAT_OPTIONS)
+
+                    _LOGGER.debug("_update_cars - Feature Check: charging_clima_control:%s ", {car.features.charging_clima_control})
                     if car.features.charging_clima_control:
-                        car.precond = self._get_car_values(api_result, car.finorvin, Precond(), PRE_COND_OPTIONS)
+                        car.precond = self._get_car_values(
+                            api_result, car.finorvin,
+                            Precond(), PRE_COND_OPTIONS)
+
+                    _LOGGER.debug("_update_cars - Feature Check: remote_engine_start:%s ", {car.features.remote_engine_start})
+                    if car.features.remote_engine_start:
+                        car.remote_start = self._get_car_values(
+                            api_result, car.finorvin,
+                            Remote_Start(), REMOTE_START_OPTIONS)
 
                 self.last_update_time = time.time()
 
@@ -407,62 +512,81 @@ class Controller(object):
 
         me_status_header = {
             "Accept-Language": self.accept_lang,
-            "Authorization": "Bearer {}".format(self.auth_handler.token_info["access_token"])
+            "Authorization": self._get_bearer_token()
         }
-        response = self.session.get(ME_STATUS_URL, headers=me_status_header,
+        response = self.session.get(ME_STATUS_URL(URL_USR_API(self.region)),
+                                    headers=me_status_header,
                                     verify=LOGIN_VERIFY_SSL_CERT)
 
         _LOGGER.debug("Me_status_response: %s", response.text)
-        
+
         cars = json.loads(
             response.content.decode('utf8'))['vehicles']
 
         if self.save_car_details:
-            with open('{0}mercedesme_status.json'.format(self.save_path), 'w') as outfile:
-                json.dump(response.content.decode('utf8'), outfile)
+            with open(f"{self.save_path}mercedesme_status.json", "w") as ofile:
+                json.dump(response.content.decode("utf8"), ofile)
 
         for c in cars:
-            
-            if c.get("fin") in self.excluded_cars:
+
+            if c.get("fin") is None or c.get("fin") in self.excluded_cars:
                 continue
 
             car = Car()
             car.finorvin = c.get("fin")
-            car.licenseplate = c.get("licensePlate", car.finorvin)
+
+            car.licenseplate = c.get("licensePlate", "")
+
+            if not car.licenseplate:
+                car.licenseplate = car.finorvin
+
+            car.vehicle_title = c.get("vehicleTitle", None)
             car.features = self._get_car_features(car.finorvin)
 
-            api_result = self._retrieve_car_details(car.finorvin).get("dynamic")
+            api_result = self._retrieve_car_details(
+                car.finorvin).get("dynamic")
 
             # car.salesdesignation = detail.get("salesDesignation")
 
-            car.odometer = self._get_car_values(api_result, car.finorvin, Odometer(), ODOMETER_OPTIONS)
-            car.tires = self._get_car_values(api_result, car.finorvin, Tires(), TIRE_OPTIONS)
-            car.doors = self._get_car_values(api_result, car.finorvin, Doors(), DOOR_OPTIONS)
+            car.odometer = self._get_car_values(
+                api_result, car.finorvin, Odometer(), ODOMETER_OPTIONS)
+
+            car.tires = self._get_car_values(
+                api_result, car.finorvin, Tires(), TIRE_OPTIONS)
+            car.doors = self._get_car_values(
+                api_result, car.finorvin, Doors(), DOOR_OPTIONS)
 
             if car.features.vehicle_locator:
                 car.location = self._get_location(car.finorvin)
 
-            car.binarysensors = self._get_car_values(api_result, car.finorvin, Binary_Sensors(), BINARY_SENSOR_OPTIONS)
-            car.windows = self._get_car_values(api_result, car.finorvin, Windows(), WINDOW_OPTIONS)
+            car.binarysensors = self._get_car_values(
+                api_result, car.finorvin,
+                Binary_Sensors(), BINARY_SENSOR_OPTIONS)
+
+            car.windows = self._get_car_values(
+                api_result, car.finorvin, Windows(), WINDOW_OPTIONS)
+
+            _LOGGER.debug("_get_cars - Feature Check: charging_clima_control:%s ", {car.features.charging_clima_control})
             if car.features.charging_clima_control:
-                car.electric = self._get_car_values(api_result, car.finorvin, Electric(), ELECTRIC_OPTIONS)
+                car.electric = self._get_car_values(
+                    api_result, car.finorvin, Electric(), ELECTRIC_OPTIONS)
+
+            _LOGGER.debug("_get_cars - Feature Check: aux_heat:%s ", {car.features.aux_heat})
             if car.features.aux_heat:
-                car.auxheat = self._get_car_values(api_result, car.finorvin, Auxheat(), AUX_HEAT_OPTIONS)
+                car.auxheat = self._get_car_values(
+                    api_result, car.finorvin, Auxheat(), AUX_HEAT_OPTIONS)
+
+            _LOGGER.debug("_get_cars - Feature Check: charging_clima_control:%s ", {car.features.charging_clima_control})
             if car.features.charging_clima_control:
-                car.precond = self._get_car_values(api_result, car.finorvin, Precond(), PRE_COND_OPTIONS)
+                car.precond = self._get_car_values(
+                    api_result, car.finorvin, Precond(), PRE_COND_OPTIONS)
+
+            _LOGGER.debug("_get_cars - Feature Check: remote_engine_start:%s ", {car.features.remote_engine_start})
+            if car.features.remote_engine_start:
+                car.remote_start = self._get_car_values(
+                    api_result, car.finorvin, Remote_Start(), REMOTE_START_OPTIONS)
 
             self.cars.append(car)
-
-    def _get_car_attribute(self, c, attribute_name, fin):
-        _LOGGER.debug("get_car_attribute %s for %s called",
-                      attribute_name,
-                      fin)
-        _LOGGER.info(c.get(attribute_name))
-        option_status = CarAttribute(c.get(attribute_name).get("value"),
-                                     c.get(attribute_name).get("status"),
-                                     0#,c.get(attribute_name).get("ts")
-                                     )
-        return option_status
 
     def _get_location(self, car_id):
         """ get refreshed location information."""
@@ -488,7 +612,8 @@ class Controller(object):
         return location
 
     def _get_car_values(self, car_detail, car_id, classInstance, options):
-        _LOGGER.debug("get_car_values %s for %s called", classInstance.name, car_id)
+        _LOGGER.debug("get_car_values %s for %s called",
+                      classInstance.name, car_id)
 
         for option in options:
             if car_detail is not None:
@@ -509,61 +634,62 @@ class Controller(object):
 
     def _get_car_features(self, car_id):
         _LOGGER.debug("_get_car_features for %s called", car_id)
-        me_status_header = {
-            "Accept-Language": self.accept_lang,
-            "Authorization": "Bearer {}".format(self.auth_handler.token_info["access_token"]),
-            "country_code": "DE",
-            "User-Agent": APP_USER_AGENT
-            }
-        features = self._retrieve_json_at_url(CAR_FEATURE_URL % car_id, me_status_header, "get", None)
+
+        features = self._retrieve_json_at_url(
+            CAR_FEATURE_URL(URL_USR_API(self.region)) % car_id,
+            self._get_default_header(),
+            HTTP_GET,
+            None)
 
         car_features = Features()
 
         if self.save_car_details:
-            with open('{0}feat_{1}.json'.format(self.save_path, car_id), 'w') as outfile:
+            with open(f"{self.save_path}feat_{car_id}.json", "w") as outfile:
                 json.dump(features, outfile)
 
         for feature in features.get("metadata").get("featureEnablements"):
-            setattr(car_features, 
+            setattr(car_features,
                     feature.get("name").lower(),
                     feature.get("enablement") == "ACTIVATED")
-        
+
         return car_features
 
     def _retrieve_car_details(self, fin):
-        me_status_header = {
-            "Accept-Language": self.accept_lang,
-            "Authorization": self._get_bearer_token(),
-            "country_code": "DE",
-            "User-Agent": "MercedesMe/2.13.2+639 (Android 5.1)"
-            }
+        header = self._get_default_header()
 
-        result = self._retrieve_json_at_url(CAR_STATUS_URL % fin, me_status_header, "get", None)
-        
+        result = self._retrieve_json_at_url(
+            CAR_STATUS_URL(URL_VHS_API(self.region)) % fin,
+            header,
+            HTTP_GET,
+            None)
+
         if self.save_car_details:
-            with open('{0}state_{1}.json'.format(self.save_path, fin), 'w') as outfile:
+            with open(f"{self.save_path}state_{fin}.json", "w") as outfile:
                 json.dump(result, outfile)
 
         return result
 
     def _retrieve_location_details(self, car_id):
         _LOGGER.debug("get location for %s called", car_id)
-        me_status_header = {
-            "Accept-Language": self.accept_lang,
-            "Authorization": self._get_bearer_token(),
-            "country_code": "DE",
-            "User-Agent": "MercedesMe/2.13.2+639 (Android 5.1)",
-            "lat": "1",
-            "lon": "1"
-            }
 
-        res = self._retrieve_json_at_url(CAR_LOCAT_URL % car_id, 
-                                         me_status_header, "get", None)
+        header = self._get_default_header()
+        header['lat'] = "1"
+        header['lon'] = "1"
+
+        res = self._retrieve_json_at_url(
+            CAR_LOCAT_URL(URL_VHS_API(self.region)) % car_id,
+            header,
+            HTTP_GET,
+            None)
+
         return res
 
     def _retrieve_json_at_url(self, url, headers, type, post_data=None):
         try:
-            _LOGGER.debug("Connect to URL %s %s", type, str(url))
+            if post_data is None:
+                _LOGGER.debug("Connect to URL %s %s %s", type, str(url), headers)
+            else:
+                _LOGGER.debug("Connect to URL %s %s %s %s", type, str(url), headers, post_data)
 
             if type == "get":
                 res = self.session.get(url,
@@ -588,6 +714,22 @@ class Controller(object):
     def _get_bearer_token(self):
         return "Bearer {}".format(self.auth_handler.token_info["access_token"])
 
+    def _get_default_header(self):
+        return {
+            "Accept-Language": self.accept_lang,
+            "Authorization": self._get_bearer_token(),
+            "country_code": self.country_code,
+            "User-Agent": APP_USER_AGENT,
+        }
+
     def _check_access_token(self):
         if self.auth_handler.is_token_expired(self.auth_handler.token_info):
-            self.auth_handler.refresh_access_token(self.auth_handler.token_info['refresh_token'])
+            self.auth_handler.refresh_access_token(
+                self.auth_handler.token_info['refresh_token'])
+
+    def _round_current_time(self, roundTo=15):
+        t = datetime.datetime.now()  # type: datetime
+        t += datetime.timedelta(minutes=(roundTo + 1))
+        t += datetime.timedelta(minutes=(t.minute / roundTo) * roundTo - t.minute)
+        t -= datetime.timedelta(seconds=(t.second))
+        return t
